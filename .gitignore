@@ -1,0 +1,23 @@
+# --- Données lourdes / régénérables ---
+# Archives brutes Ville de Paris 2014-2025 (~75 Go) : à télécharger localement
+old_data/
+# Fichiers intermédiaires (régénérés par dataset_annee.ipynb / fusion_annees.ipynb)
+data/processed/annees/
+data/processed/trafic_3_arcs_historique.csv
+# -> on garde data/processed/trafic_3_arcs_complet.csv (dataset partagé pour le modèle)
+
+# --- Python / environnement ---
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# --- Éditeurs / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Fichiers temporaires Office (ex. ~$Brief.pptx quand le fichier est ouvert) ---
+~$*
