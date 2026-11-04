@@ -1,6 +1,6 @@
 # Dataset trafic : 3 arcs, 2014 → 2026
 
-**Fichier à utiliser : `trafic_3_arcs_complet.csv`** (337 464 lignes, ~29 Mo)
+**Un fichier par axe** : `champs_elysees.csv`, `convention.csv`, `saints_peres.csv` (112 488 lignes chacun, 337 464 au total)
 
 Mesures horaires des capteurs de la Ville de Paris sur les 3 arcs du challenge,
 du **01/01/2014 au 01/11/2026**. Une ligne = un axe × une heure. La grille horaire est complète :
@@ -29,13 +29,15 @@ s'il n'y a pas de mesure, la ligne existe quand même avec `debit` / `occupation
 ## Importer
 
 ```python
-import pandas as pd
+from dataset_create import charger
 
-df = pd.read_csv("data/processed/trafic_3_arcs_complet.csv", low_memory=False)
-df["datetime_utc"] = pd.to_datetime(df["datetime_utc"], utc=True)
+df = charger()                    # les 3 axes ; charger("Convention") pour un seul
+# Équivalent à la main :
+#   df = pd.read_csv("data/processed_data/convention.csv", low_memory=False)
+#   df["datetime_utc"] = pd.to_datetime(df["datetime_utc"], utc=True)
 # Heure de Paris : à utiliser pour les features (heure, jour de semaine...), le trafic suit l'heure locale.
 # Garder datetime_utc pour les jointures et les décalages (lags) : unique même au changement d'heure.
-df["datetime"] = df["datetime_utc"].dt.tz_convert("Europe/Paris")
+# df["datetime"] = df["datetime_utc"].dt.tz_convert("Europe/Paris")  (déjà fait par charger)
 
 # Exemple : une série par axe et par cible
 debit = df.pivot(index="datetime", columns="axe", values="debit")
@@ -57,7 +59,13 @@ debit = df.pivot(index="datetime", columns="axe", values="debit")
 
 ## Comment il a été construit
 
-`dataset_annee.ipynb` (une année d'`old_data` → `annees/trafic_<année>.csv`) puis
-`fusion_annees.ipynb` (fusion + ajout des données récentes). Sur la période commune (oct.-déc. 2025),
-les deux sources sont identiques (écart 0) ; on garde la source récente.
+`dataset_create.py` à la racine (`.venv/Scripts/python dataset_create.py --jobs 4`, ~5 min) :
+
+- `dataset_annee(annee)` : lit `data/unprocessed_data/<annee>/` (archives `*.txt` 2014-2025 ou
+  exports du challenge `*.csv` dans `2026/`), garde les 3 arcs, renvoie la grille horaire complète.
+- `dataset_complet()` : appelle `dataset_annee` pour chaque année et fusionne.
+  Sur la période commune (oct.-déc. 2025) les deux sources sont identiques (écart 0) ; on garde la source récente.
+- `sauvegarder_par_axe(df)` : écrit les 3 CSV.
+
+Les archives 2014-2025 (~75 Go) ne sont pas versionnées : à placer dans `data/unprocessed_data/<année>/`.
 Définitions des champs : notice Ville de Paris *Données de trafic issues des capteurs permanents* (juin 2019).

@@ -1,10 +1,9 @@
-# --- Données lourdes / régénérables ---
-# Archives brutes Ville de Paris 2014-2025 (~75 Go) : à télécharger localement
-old_data/
-# Fichiers intermédiaires (régénérés par dataset_annee.ipynb / fusion_annees.ipynb)
-data/processed/annees/
-data/processed/trafic_3_arcs_historique.csv
-# -> on garde data/processed/trafic_3_arcs_complet.csv (dataset partagé pour le modèle)
+# --- Données lourdes ---
+# Archives brutes Ville de Paris 2014-2025 (~75 Go) : à télécharger localement.
+# On versionne seulement les exports du challenge (data/unprocessed_data/2026/)
+data/unprocessed_data/*
+!data/unprocessed_data/2026/
+# -> data/processed_data/ est versionné (datasets partagés pour le modèle, régénérés par dataset_create.py)
 
 # --- Python / environnement ---
 .venv/
