@@ -1,0 +1,25 @@
+﻿Identifiant arc;Libelle;Date et heure de comptage;Débit horaire;Taux d'occupation;Etat trafic;Identifiant noeud amont;Libelle noeud amont;Identifiant noeud aval;Libelle noeud aval;Etat arc;Date debut dispo data;Date fin dispo data;geo_point_2d;geo_shape
+4267;Av_des_Champs_Elysees;2026-07-07T00:00:00+02:00;757.0;8.76334;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T23:00:00+02:00;669.0;8.54722;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T22:00:00+02:00;863.0;10.50834;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T21:00:00+02:00;1002.0;11.05667;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T20:00:00+02:00;1092.0;12.86444;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T19:00:00+02:00;1144.0;14.635;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T18:00:00+02:00;;;Inconnu;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Invalide;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T17:00:00+02:00;1040.0;13.99611;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T16:00:00+02:00;1019.0;19.26278;Pré-saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T15:00:00+02:00;966.0;14.92167;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T14:00:00+02:00;923.0;31.53389;Saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T13:00:00+02:00;1112.0;30.09333;Saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T12:00:00+02:00;989.0;28.51889;Pré-saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T11:00:00+02:00;;;Inconnu;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Invalide;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T10:00:00+02:00;;;Inconnu;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Invalide;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T09:00:00+02:00;1077.0;38.46111;Saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T08:00:00+02:00;1127.0;16.92056;Pré-saturé;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T07:00:00+02:00;662.0;6.43056;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T06:00:00+02:00;338.0;3.19222;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T05:00:00+02:00;248.0;2.52556;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T04:00:00+02:00;305.0;3.61889;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T03:00:00+02:00;521.0;6.5;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T02:00:00+02:00;676.0;7.85055;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
+4267;Av_des_Champs_Elysees;2026-07-06T01:00:00+02:00;774.0;10.51;Fluide;2296;Av_Champs_Elysees-Balzac;2294;Av_Champs_Elysees-Washington;Ouvert;;;;
