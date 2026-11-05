@@ -63,7 +63,7 @@ def imputer_voisins(df: pd.DataFrame, seuil: float = 0.8) -> pd.DataFrame:
         cols = corr[(corr >= seuil) & utile].index
         dispo = X[cols].notna().any(axis=1)
         X = X[cols].assign(heure=g.datetime.dt.hour, jour_sem=g.datetime.dt.day_of_week)
-        model = HistGradientBoostingRegressor(max_iter=500, learning_rate=0.05).fit(X[y.notna() & dispo], y[y.notna() & dispo])
+        model = HistGradientBoostingRegressor(max_iter=500, learning_rate=0.05, random_state=0).fit(X[y.notna() & dispo], y[y.notna() & dispo])
         trou = (y.isna() & dispo)[lambda s: s].index
         df.loc[trou, "debit"] = model.predict(X.loc[trou]).clip(0)
         df.loc[trou, "impute_debit"] = True
