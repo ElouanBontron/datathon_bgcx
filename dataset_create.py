@@ -23,11 +23,15 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
+from imputation_voisins import imputer_voisins
 
 ROOT = Path(__file__).resolve().parent
 UNPROCESSED_DIR = ROOT / "data" / "unprocessed_data"
 PROCESSED_DIR = ROOT / "data" / "processed_data"
+EXTERNAL_DIR = ROOT / "data" / "external"
 
 # Arcs cibles : axe -> (noeud amont, noeud aval). Identique dans les deux formats.
 ARCS_CIBLES = {
@@ -231,14 +235,93 @@ def bilan(df: pd.DataFrame) -> pd.DataFrame:
     return df.groupby(["axe", annee])["debit"].apply(lambda s: round(s.isna().mean() * 100, 1)).unstack("axe")
 
 
-def charger(axe: str | None = None, out_dir: Path = PROCESSED_DIR) -> pd.DataFrame:
-    """Recharge les CSV produits (un axe ou les 3), avec datetime_utc et datetime (Paris) parsés."""
+def imputer_profil(df: pd.DataFrame, c: str) -> pd.DataFrame:
+    """Trous de `c` comblés par la moyenne des 52 dernières vraies valeurs à la même heure et le même jour de
+    semaine (~1 an de données, uniquement du passé). Met `impute_<c>` = True sur ces lignes."""
+    profil = lambda s: s.dropna().rolling(52, min_periods=1).mean().reindex(s.index).ffill()
+    moy = df.groupby(["axe", df.datetime.dt.hour, df.datetime.dt.day_of_week])[c].transform(profil)
+    trou = df[c].isna() & moy.notna()
+    return df.assign(**{c: df[c].fillna(moy), f"impute_{c}": trou})
+
+
+def charger(axe: str | None = None, imputer: bool = False, out_dir: Path = PROCESSED_DIR) -> pd.DataFrame:
+    """Dataset nettoyé (un axe ou les 3) : grille horaire complète + météo/calendrier/événements.
+    imputer=False : `debit` / `occupation` = NaN quand pas de mesure fiable (à gérer par le modèle, ex. LightGBM).
+    imputer=True  : débit comblé via les rues voisines, occupation via son profil passé (imputer_profil)
+                    (`impute_debit` / `impute_occupation` = True sur ces lignes)."""
     axes = list(FICHIERS_SORTIE) if axe is None else [axe]
     df = pd.concat([pd.read_csv(Path(out_dir) / FICHIERS_SORTIE[a], low_memory=False) for a in axes],
                    ignore_index=True)
     df["datetime_utc"] = pd.to_datetime(df["datetime_utc"], utc=True)
     df["datetime"] = df["datetime_utc"].dt.tz_convert("Europe/Paris")
-    return df
+
+    for c in ["debit", "occupation"]:
+        df[c] = df[c].mask(df.etat_arc == "Invalide")
+        df[c] = df[c].mask(df[c] > 1.5 * df.groupby("axe")[c].transform("quantile", 0.999))  # aberrations
+    df = df.assign(impute_debit=False, impute_occupation=False)
+    if imputer:
+        df = imputer_profil(imputer_voisins(df), "occupation")
+    return externes(df).drop(columns=["datetime_utc", "etat_arc_code", "ligne_absente", "source",
+                                      "etat_arc"]).reset_index(drop=True)
+
+
+def externes(df: pd.DataFrame) -> pd.DataFrame:
+    """Joint météo (sur datetime_utc), calendrier et événements (sur le jour en heure de Paris)."""
+    lire = lambda nom, date: pd.read_csv(EXTERNAL_DIR / nom, parse_dates=[date])
+    df = df.merge(lire("meteo_paris.csv", "datetime_utc"), on="datetime_utc", how="left")
+    df["date"] = df.datetime.dt.normalize().dt.tz_localize(None)
+    df = df.merge(lire("calendrier_paris.csv", "date"), on="date", how="left")
+    df = df.merge(lire("evenements_paris.csv", "date"), on=["date", "axe"], how="left")
+    df["vacances"] = df.nom_vacances.fillna("Aucune").astype("category")
+    return df.drop(columns=["date", "nom_vacances"])
+
+
+BOOLS = ["ferie", "pont", "paris_respire", "evenement", "confinement"]
+LAGS = (7, 14, 21, 28)  # jours ; >= horizon pour rester connus le jour J
+FEATURES = ["axe", "heure", "jour_sem", "heure_sem", "type_jour", "mois", "lag_7j", "lag_14j", "lag_moy",
+            "vacances", *BOOLS]  # chantier retiré : base vide avant 2020, trou 2024-26, et 10 chantiers
+#                                     sur les Champs la semaine notée -> occupation prédite x2.3
+# Toutes les features utilisables (= connues le jour J), y compris celles testées puis écartées
+TOUTES = [*FEATURES, "lag_21j", "lag_28j", "chantier", "pluie", "neige", "temperature_2m", "relative_humidity_2m",
+          "precipitation", "snowfall", "cloud_cover", "wind_speed_10m", "weather_code"]
+
+
+def feature_engineering(df: pd.DataFrame, cible: str = "debit", t0=None) -> pd.DataFrame:
+    """Toutes les features candidates. Lags de `cible` (valeurs >= t0 traitées comme inconnues, comme le jour J) :
+    même heure il y a 7/14/21/28 j + leur moyenne ; calendrier (type de jour semaine/samedi/dimanche-férié) ;
+    météo en 2 indicateurs 0/1 (pluie >= 0.5 mm/h, neige > 0 ; NaN si météo inconnue)."""
+    meteo = lambda s: s.astype(float).where(df.precipitation.notna())
+    v = df[cible] if t0 is None else df[cible].where(df.datetime < t0)
+    base = df[["axe", "datetime"]].assign(v=v)
+    for k in LAGS:
+        lag = base.assign(datetime=base.datetime + pd.Timedelta(days=k)).rename(columns={"v": f"lag_{k}j"})
+        df = df.merge(lag, on=["axe", "datetime"], how="left")
+    jour = df.datetime.dt.dayofweek
+    return df.assign(lag_moy=df[[f"lag_{k}j" for k in LAGS]].mean(axis=1), heure=df.datetime.dt.hour, jour_sem=jour,
+                     heure_sem=jour * 24 + df.datetime.dt.hour, mois=df.datetime.dt.month, type_jour=np.select([df.ferie | (jour == 6), jour == 5], [2, 1], 0),
+                     pluie=meteo(df.precipitation >= 0.5), neige=meteo(df.snowfall > 0), axe=df.axe.astype("category"))
+
+
+HORIZON = 120  # heures notées : 07/11 00h -> 11/11 23h (sam -> mer)
+# coupures du backtest : vendredis 00h (dernière donnée = jeudi soir, test sam -> mer comme le jour J)
+ORIGINES = [*pd.date_range("2024-11-01", "2026-10-30", freq="W-FRI").strftime("%Y-%m-%d")]
+
+
+def split(df: pd.DataFrame, t0: str, gap: str = "1D", cible: str = "debit", min_reel: float = 0.85,
+          features: list | str | None = None):
+    """Rejoue le challenge à la date t0 (= dernière donnée connue) -> X_train, X_test, y_train, y_test.
+    train = tout avant t0 ; test = HORIZON heures démarrant `gap` après t0, vraies valeurs seulement,
+    pour les axes ayant >= min_reel de l'horizon observé (sinon l'axe est absent du test).
+    features : None = sélection par défaut (FEATURES), "toutes" = TOUTES, ou une liste de colonnes."""
+    t0 = pd.Timestamp(t0, tz="Europe/Paris")
+    df = feature_engineering(df, cible, t0).dropna(subset=[cible])
+    debut = t0 + pd.Timedelta(gap)
+    test = df.datetime.between(debut, debut + pd.Timedelta(hours=HORIZON - 1)) & ~df[f"impute_{cible}"]
+    test &= test.groupby(df.axe, observed=True).transform("sum") >= min_reel * HORIZON
+    train = df.datetime < t0
+    X, y = df[TOUTES if features == "toutes" else features or FEATURES], df[cible]
+    X = X.astype({c: float for c in X if X[c].dtype == bool})
+    return X[train], X[test], y[train], y[test]
 
 
 if __name__ == "__main__":
