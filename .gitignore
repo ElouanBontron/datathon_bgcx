@@ -5,6 +5,11 @@ data/unprocessed_data/*
 !data/unprocessed_data/2026/
 # -> data/processed_data/ est versionné (datasets partagés pour le modèle, régénérés par dataset_create.py)
 
+# Fichiers lourds non utilisés par le code (exploration / anciens caches)
+# -> on garde data/external/voisins_debit.csv : nécessaire à charger(imputer=True)
+data/external/capteurs_paris.csv
+data/processed_data/debit_voisins.csv
+
 # --- Python / environnement ---
 .venv/
 __pycache__/
