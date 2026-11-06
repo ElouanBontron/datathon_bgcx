@@ -59,7 +59,8 @@ def imputer_voisins(df: pd.DataFrame, seuil: float = 0.8) -> pd.DataFrame:
         y = g.debit
         X = V.reindex(g.datetime_utc).set_index(g.index)
         cols = [c for c in X if c.rsplit("_", 1)[0] in VOISINS[axe]]
-        corr, utile = X[cols].corrwith(y, min_periods=500), X.loc[y.isna(), cols].notna().sum() >= 24
+        corr = X[cols].apply(lambda x: x.corr(y, min_periods=500))
+        utile = X.loc[y.isna(), cols].notna().sum() >= 24
         cols = corr[(corr >= seuil) & utile].index
         dispo = X[cols].notna().any(axis=1)
         X = X[cols].assign(heure=g.datetime.dt.hour, jour_sem=g.datetime.dt.day_of_week)
