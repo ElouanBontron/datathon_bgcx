@@ -25,3 +25,12 @@ desktop.ini
 
 # --- Fichiers temporaires Office (ex. ~$Brief.pptx quand le fichier est ouvert) ---
 ~$*
+
+# FlowPilot : fichiers locaux non publiables
+.streamlit/secrets.toml
+.pytest_cache/
+artifacts/*verification.ics
+backups/
+upstream/
+.env
+.env.local
