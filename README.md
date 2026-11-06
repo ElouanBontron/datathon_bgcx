@@ -1,5 +1,26 @@
 # BCG X Datathon
 
+## Interface client FlowPilot
+
+Une page avec trois onglets : **Vue d'ensemble**, **Impact**, **Livraisons**. Carte de Paris, gains estimes, import des previsions CSV et planning exportable dans un agenda.
+
+**Windows :** double-cliquer sur `Lancer_FlowPilot.bat`, puis ouvrir http://localhost:8501.
+
+**Installation manuelle (Python 3.11+) :**
+
+```bash
+python -m venv .venv
+# Linux/macOS : source .venv/bin/activate
+# Windows : .venv\Scripts\activate
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+[Guide FlowPilot](docs/FLOWPILOT.md) : installation, hypotheses, import CSV et tests. Le profil historique et les gains sont des estimations, en attendant les previsions finales de l'equipe.
+
+![Vue d'ensemble de FlowPilot](artifacts/flowpilot_overview.png)
+
+
 ## Données
 
 Dans le dossier `data` on peut trouver 3 fichiers différents : `external`, `processed_data` et `unprocessed_data` :
