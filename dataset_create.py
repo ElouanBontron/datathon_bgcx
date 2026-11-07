@@ -289,7 +289,8 @@ FEATURES = ["axe", "heure", "jour_sem", "heure_sem", "type_jour", "mois", "lag_7
 # Toutes les features utilisables (= connues le jour J), y compris celles testées puis écartées
 TOUTES = [*FEATURES, "lag_21j", "lag_28j", "chantier", "pluie", "neige", "temperature_2m", "relative_humidity_2m",
           "precipitation", "snowfall", "cloud_cover", "wind_speed_10m", "weather_code",
-          "veille_ferie", "lendemain_ferie", "profil_ferie"]
+          "veille_ferie", "lendemain_ferie", "profil_ferie", "pluie_jour", "pluie_forte", "neige_gel"]
+METEO = ["pluie_jour", "pluie_forte", "neige_gel"]  # en test (voir notebooks/lightgbm.ipynb)
 
 
 def feature_engineering(df: pd.DataFrame, cible: str = "debit", t0=None) -> pd.DataFrame:
@@ -326,7 +327,10 @@ def feature_engineering(df: pd.DataFrame, cible: str = "debit", t0=None) -> pd.D
     cle = pd.Series(np.where(df.paris_respire, "PR", np.where(df.evenement, df.datetime.dt.strftime("%m-%d"), None)), df.index)
     passe = barre.astype(float).where(cle.notna() & ((df.datetime < t0) if t0 is not None else True))
     df["fermeture_prevue"] = passe.groupby([df.axe, heure, cle]).transform(lambda x: x.expanding().mean().shift(1)).fillna(0)
-    return df.assign(veille_ferie=(date + pd.Timedelta("1D")).isin(feries), lendemain_ferie=(date - pd.Timedelta("1D")).isin(feries))
+    # météo par mécanisme (NaN si inconnue) : journée pluvieuse (report vélo -> voiture), averse forte, neige ou verglas
+    return df.assign(veille_ferie=(date + pd.Timedelta("1D")).isin(feries), lendemain_ferie=(date - pd.Timedelta("1D")).isin(feries),
+                     pluie_jour=meteo(df.precipitation.groupby([df.axe, date]).transform("sum") >= 5), pluie_forte=meteo(df.precipitation >= 4),
+                     neige_gel=meteo((df.snowfall > 0) | ((df.temperature_2m < 0) & (df.precipitation > 0))))
 
 
 HORIZON = 120  # heures notées : 07/11 00h -> 11/11 23h (sam -> mer)

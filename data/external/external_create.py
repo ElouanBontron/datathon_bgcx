@@ -25,7 +25,8 @@ evenements_paris.csv :
 - date, axe     : jour (heure de Paris) et axe
 - paris_respire : True si Champs-Élysées piétons (1er dimanche du mois depuis mai 2016, ~10h-18h)
 - evenement     : True si événement sur les Champs (8 mai, 14 juillet, 11 nov., 31 déc., arrivée du Tour,
-                  finale Coupe du monde 2018, samedis gilets jaunes nov. 2018 - mars 2019)
+                  finale Coupe du monde 2018, samedis gilets jaunes nov. 2018 - mars 2019 + 21/09/2019)
+                  + tous les axes : mobilisations 2026 (gilets jaunes 17/10, 24/10, 31/10, 07/11 et grève du 05/11)
 - confinement   : True si confinement Covid (tous les axes)
 - chantier      : nb de chantiers sur la chaussée à moins de 150 m de l'arc (Open Data Paris ;
                   trou possible pour les chantiers commencés ET finis entre 2024 et 2026)
@@ -42,6 +43,17 @@ def meteo():
     df = pd.read_csv(url, skiprows=3).rename(columns=lambda c: c.split(" (")[0])
     df["datetime_utc"] = pd.to_datetime(df.pop("time"), utc=True)
     df.to_csv("meteo_paris.csv", index=False)
+
+
+def meteo_recente():
+    """Complète meteo_paris.csv avec l'API prévision d'Open-Meteo : 7 jours passés + 7 jours prévus (test final + rendu)."""
+    vars_ = "temperature_2m,relative_humidity_2m,precipitation,snowfall,cloud_cover,wind_speed_10m,weather_code"
+    url = ("https://api.open-meteo.com/v1/forecast?latitude=48.8566&longitude=2.3522"
+           f"&past_days=7&forecast_days=7&timezone=GMT&format=csv&hourly={vars_}")
+    new = pd.read_csv(url, skiprows=3).rename(columns=lambda c: c.split(" (")[0])
+    new["datetime_utc"] = pd.to_datetime(new.pop("time"), utc=True)
+    old = pd.read_csv("meteo_paris.csv", parse_dates=["datetime_utc"])
+    pd.concat([old, new[new.datetime_utc > old.datetime_utc.max()]]).to_csv("meteo_paris.csv", index=False)
 
 
 def calendrier():
@@ -62,8 +74,10 @@ def evenements():
             "2021-07-18", "2022-07-24", "2023-07-23", "2025-07-27"]
     confinements = [("2020-03-17", "2020-05-10"), ("2020-10-30", "2020-12-14"), ("2021-04-03", "2021-05-02")]
     j = JOURS
-    gilets_jaunes = j[(j.day_of_week == 5) & (j >= "2018-11-17") & (j <= "2019-03-16")]
+    gilets_jaunes = j[(j.day_of_week == 5) & (j >= "2018-11-17") & (j <= "2019-03-16")].union(pd.to_datetime(["2019-09-21"]))  # + acte 45
     events = j[j.strftime("%m-%d").isin(["05-08", "07-14", "11-11", "12-31"])].union(pd.to_datetime(tour + ["2018-07-15"])).union(gilets_jaunes)
+    # mouvement contre la vie chère 2026 (gilets jaunes actes I à IV + grève du 05/11) : débit en baisse sur les 3 arcs
+    manifs_2026 = pd.to_datetime(["2026-10-17", "2026-10-24", "2026-10-31", "2026-11-05", "2026-11-07"])
 
     out = []
     for axe, (lon, lat) in arcs.items():
@@ -73,7 +87,7 @@ def evenements():
         out.append(pd.DataFrame({
             "date": j, "axe": axe,
             "paris_respire": champs & (j.day_of_week == 6) & (j.day <= 7) & (j >= "2016-05-08"),
-            "evenement": champs & j.isin(events),
+            "evenement": (champs & j.isin(events)) | j.isin(manifs_2026),
             "confinement": sum((j >= a) & (j <= b) for a, b in confinements).astype(bool),
             "chantier": [((c.date_debut <= d) & (c.date_fin >= d)).sum() for d in j],
         }))

@@ -10,6 +10,14 @@ data/unprocessed_data/*
 data/external/capteurs_paris.csv
 data/processed_data/debit_voisins.csv
 
+# --- Résultats régénérés par le code (seul le rendu output/output_flowerrangers.csv est versionné) ---
+data/predictions/
+data/external/test_final*.csv
+model/output_*.csv
+ensemble_results.csv
+test_results.json
+*.pdf
+
 # --- Python / environnement ---
 .venv/
 __pycache__/
