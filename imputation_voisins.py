@@ -1,7 +1,7 @@
 """Imputation des heures manquantes du débit de nos 3 arcs à partir des capteurs des rues voisines.
 
 Usage : charger(imputer=True) dans dataset_create, ou directement imputer_voisins(df).
-Explications : explication_voisins_v2.pdf
+Explications et comparaison avec ffill / interpolation : notebooks/voisins_imputation.ipynb
 """
 
 import io
@@ -59,11 +59,12 @@ def imputer_voisins(df: pd.DataFrame, seuil: float = 0.8) -> pd.DataFrame:
         y = g.debit
         X = V.reindex(g.datetime_utc).set_index(g.index)
         cols = [c for c in X if c.rsplit("_", 1)[0] in VOISINS[axe]]
-        corr, utile = X[cols].corrwith(y, min_periods=500), X.loc[y.isna(), cols].notna().sum() >= 24
+        corr = X[cols].apply(lambda x: x.corr(y, min_periods=500))
+        utile = X.loc[y.isna(), cols].notna().sum() >= 24
         cols = corr[(corr >= seuil) & utile].index
         dispo = X[cols].notna().any(axis=1)
         X = X[cols].assign(heure=g.datetime.dt.hour, jour_sem=g.datetime.dt.day_of_week)
-        model = HistGradientBoostingRegressor(max_iter=500, learning_rate=0.05).fit(X[y.notna() & dispo], y[y.notna() & dispo])
+        model = HistGradientBoostingRegressor(max_iter=500, learning_rate=0.05, random_state=0).fit(X[y.notna() & dispo], y[y.notna() & dispo])
         trou = (y.isna() & dispo)[lambda s: s].index
         df.loc[trou, "debit"] = model.predict(X.loc[trou]).clip(0)
         df.loc[trou, "impute_debit"] = True

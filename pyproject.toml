@@ -1,11 +1,10 @@
 [project]
 name = "bcg-x-datachallenge"
 version = "0.1.0"
-description = "Add your description here"
+description = "BCG X Datathon 2026 : prévision du trafic de 3 arcs parisiens (débit et taux d occupation)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "chronos-forecasting>=2.3.2",
     "ipykernel>=7.4.0",
     "lightgbm>=4.7.0",
     "matplotlib>=3.11.2",
@@ -14,5 +13,9 @@ dependencies = [
     "requests>=2.34.2",
     "scikit-learn>=1.9.1",
     "seaborn>=0.13.2",
+    "timestral",
     "xgboost>=3.2.0",
 ]
+
+[tool.uv.sources]
+timestral = { git = "https://github.com/mistralai/timestral.git" }

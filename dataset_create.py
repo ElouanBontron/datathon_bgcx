@@ -20,13 +20,15 @@ Depuis un notebook :
 """
 
 import argparse
+import io
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 
-from imputation_voisins import imputer_voisins
+from imputation_voisins import API_COMPTAGES, imputer_voisins
 
 ROOT = Path(__file__).resolve().parent
 UNPROCESSED_DIR = ROOT / "data" / "unprocessed_data"
@@ -258,7 +260,7 @@ def charger(axe: str | None = None, imputer: bool = False, out_dir: Path = PROCE
     for c in ["debit", "occupation"]:
         df[c] = df[c].mask(df.etat_arc == "Invalide")
         df[c] = df[c].mask(df[c] > 1.5 * df.groupby("axe")[c].transform("quantile", 0.999))  # aberrations
-    df = df.assign(impute_debit=False, impute_occupation=False)
+    df = df.assign(impute_debit=False, impute_occupation=False, barre=(df.etat_arc_code == 2) | (df.etat_arc == "Barré"))
     if imputer:
         df = imputer_profil(imputer_voisins(df), "occupation")
     return externes(df).drop(columns=["datetime_utc", "etat_arc_code", "ligne_absente", "source",
@@ -279,11 +281,16 @@ def externes(df: pd.DataFrame) -> pd.DataFrame:
 BOOLS = ["ferie", "pont", "paris_respire", "evenement", "confinement"]
 LAGS = (7, 14, 21, 28)  # jours ; >= horizon pour rester connus le jour J
 FEATURES = ["axe", "heure", "jour_sem", "heure_sem", "type_jour", "mois", "lag_7j", "lag_14j", "lag_moy",
-            "vacances", *BOOLS]  # chantier retiré : base vide avant 2020, trou 2024-26, et 10 chantiers
+            "vacances", *BOOLS,
+            "profil_normal",                # backtest : 92.5 -> 89.9, biais réduit sur les 3 arcs
+            "fermeture_prevue", "lag_an"]   # backtest : erreur fériés/événements 136 -> 124
+#                                     chantier retiré : base vide avant 2020, trou 2024-26, et 10 chantiers
 #                                     sur les Champs la semaine notée -> occupation prédite x2.3
 # Toutes les features utilisables (= connues le jour J), y compris celles testées puis écartées
 TOUTES = [*FEATURES, "lag_21j", "lag_28j", "chantier", "pluie", "neige", "temperature_2m", "relative_humidity_2m",
-          "precipitation", "snowfall", "cloud_cover", "wind_speed_10m", "weather_code"]
+          "precipitation", "snowfall", "cloud_cover", "wind_speed_10m", "weather_code",
+          "veille_ferie", "lendemain_ferie", "profil_ferie", "pluie_jour", "pluie_forte", "neige_gel"]
+METEO = ["pluie_jour", "pluie_forte", "neige_gel"]  # en test (voir notebooks/lightgbm.ipynb)
 
 
 def feature_engineering(df: pd.DataFrame, cible: str = "debit", t0=None) -> pd.DataFrame:
@@ -296,10 +303,34 @@ def feature_engineering(df: pd.DataFrame, cible: str = "debit", t0=None) -> pd.D
     for k in LAGS:
         lag = base.assign(datetime=base.datetime + pd.Timedelta(days=k)).rename(columns={"v": f"lag_{k}j"})
         df = df.merge(lag, on=["axe", "datetime"], how="left")
-    jour = df.datetime.dt.dayofweek
-    return df.assign(lag_moy=df[[f"lag_{k}j" for k in LAGS]].mean(axis=1), heure=df.datetime.dt.hour, jour_sem=jour,
-                     heure_sem=jour * 24 + df.datetime.dt.hour, mois=df.datetime.dt.month, type_jour=np.select([df.ferie | (jour == 6), jour == 5], [2, 1], 0),
-                     pluie=meteo(df.precipitation >= 0.5), neige=meteo(df.snowfall > 0), axe=df.axe.astype("category"))
+    jour, heure, s = df.datetime.dt.dayofweek, df.datetime.dt.hour, pd.Series(v.values, df.index)
+    df = df.assign(lag_moy=df[[f"lag_{k}j" for k in LAGS]].mean(axis=1), heure=heure, jour_sem=jour,
+                   heure_sem=jour * 24 + heure, mois=df.datetime.dt.month, type_jour=np.select([df.ferie | (jour == 6), jour == 5], [2, 1], 0),
+                   pluie=meteo(df.precipitation >= 0.5), neige=meteo(df.snowfall > 0), axe=df.axe.astype("category"))
+
+    # --- Jours spéciaux (tout est calculé avec le passé uniquement) ---
+    date = pd.to_datetime(df.datetime.dt.date)
+    feries = date[df.ferie].unique()
+    barre = df.get("barre", pd.Series(False, df.index)).astype("boolean").fillna(False).astype(bool)
+    if t0 is not None:
+        barre &= df.datetime < t0  # l'état "barré" n'est connu qu'après coup
+    dernieres = lambda x, k: x.dropna().rolling(k, min_periods=1).mean().reindex(x.index).ffill().shift(1)  # moy. des k dernières valeurs connues
+    atypique = df.ferie | df.pont | df.evenement | df.paris_respire | barre
+    # même heure, même jour de semaine, 6 dernières semaines, sans les jours atypiques
+    df["profil_normal"] = s.where(~atypique).groupby([df.axe, jour, heure]).transform(lambda x: x.shift(1).rolling(6, min_periods=1).mean())
+    # même heure lors des 3 derniers fériés tombés en semaine
+    df["profil_ferie"] = s.where(df.ferie & (jour < 5)).groupby([df.axe, heure]).transform(lambda x: dernieres(x, 3))
+    # même jour calendaire, même heure, un an plus tôt (fériés à date fixe : 11/11, 14/07...)
+    an = s.groupby([df.axe.astype(str), df.datetime.dt.tz_localize(None)]).mean()
+    df["lag_an"] = an.reindex(pd.MultiIndex.from_arrays([df.axe.astype(str), df.datetime.dt.tz_localize(None) - pd.DateOffset(years=1)])).values
+    # part des éditions passées du même événement (même date, ou Paris Respire) où cette heure était barrée
+    cle = pd.Series(np.where(df.paris_respire, "PR", np.where(df.evenement, df.datetime.dt.strftime("%m-%d"), None)), df.index)
+    passe = barre.astype(float).where(cle.notna() & ((df.datetime < t0) if t0 is not None else True))
+    df["fermeture_prevue"] = passe.groupby([df.axe, heure, cle]).transform(lambda x: x.expanding().mean().shift(1)).fillna(0)
+    # météo par mécanisme (NaN si inconnue) : journée pluvieuse (report vélo -> voiture), averse forte, neige ou verglas
+    return df.assign(veille_ferie=(date + pd.Timedelta("1D")).isin(feries), lendemain_ferie=(date - pd.Timedelta("1D")).isin(feries),
+                     pluie_jour=meteo(df.precipitation.groupby([df.axe, date]).transform("sum") >= 5), pluie_forte=meteo(df.precipitation >= 4),
+                     neige_gel=meteo((df.snowfall > 0) | ((df.temperature_2m < 0) & (df.precipitation > 0))))
 
 
 HORIZON = 120  # heures notées : 07/11 00h -> 11/11 23h (sam -> mer)
@@ -322,6 +353,55 @@ def split(df: pd.DataFrame, t0: str, gap: str = "1D", cible: str = "debit", min_
     X, y = df[TOUTES if features == "toutes" else features or FEATURES], df[cible]
     X = X.astype({c: float for c in X if X[c].dtype == bool})
     return X[train], X[test], y[train], y[test]
+
+
+def ajouter_futur(df: pd.DataFrame, cible: str, fin) -> tuple[pd.DataFrame, pd.Timestamp]:
+    """Ajoute à df les heures vides de la fin des données jusqu'à `fin` (avec calendrier / événements) et calcule
+    les features comme le jour J (rien n'est connu après la dernière donnée t0) -> (dataset avec features, t0)."""
+    t0, fin = df.datetime.max() + pd.Timedelta("1h"), pd.Timestamp(fin)
+    fin = fin.tz_localize("Europe/Paris") if fin.tz is None else fin
+    f = pd.DataFrame([(a, h) for a in df.axe.unique() for h in pd.date_range(t0, fin, freq="h")], columns=["axe", "datetime"])
+    f = externes(f.assign(datetime_utc=f.datetime.dt.tz_convert("UTC"))).drop(columns="datetime_utc")
+    full = pd.concat([df, f.assign(impute_debit=False, impute_occupation=False)], ignore_index=True)
+    return feature_engineering(full.assign(vacances=full.vacances.astype("category")), cible, t0), t0
+
+
+def vraies_valeurs(df: pd.DataFrame) -> pd.DataFrame:
+    """Vraies valeurs après la fin de df (axe, datetime, debit, occupation), téléchargées sur l'API open data.
+    Cache data/external/test_final.csv : le supprimer pour mettre à jour."""
+    cache = EXTERNAL_DIR / "test_final.csv"
+    if not cache.exists():
+        t0 = df.datetime.max() + pd.Timedelta("1h")
+        ids = {str(i): a for a, i in df.groupby("axe").arc_id.agg(lambda s: s.mode()[0]).items()}
+        r = requests.get(API_COMPTAGES, timeout=300, params={"select": "iu_ac,t_1h,q,k,etat_barre",
+                         "where": f"iu_ac in ({','.join(map(repr, ids))}) and t_1h >= date'{t0:%Y-%m-%d}'"})
+        v = pd.read_csv(io.StringIO(r.content.decode("utf-8-sig")), sep=";", dtype={"iu_ac": str})
+        v.loc[v.etat_barre == "Invalide", ["q", "k"]] = np.nan
+        v.assign(axe=v.iu_ac.map(ids)).rename(columns={"t_1h": "datetime", "q": "debit", "k": "occupation"})[
+            ["axe", "datetime", "debit", "occupation"]].to_csv(cache, index=False)
+    return pd.read_csv(cache).assign(datetime=lambda v: pd.to_datetime(v.datetime, utc=True).dt.tz_convert("Europe/Paris"))
+
+
+def avec_recent(df: pd.DataFrame) -> pd.DataFrame:
+    """df + les vraies valeurs récentes (celles du test final), heure par heure pour chaque arc (NaN si manquante)."""
+    v = vraies_valeurs(df)
+    h = pd.date_range(df.datetime.max() + pd.Timedelta("1h"), v.datetime.max(), freq="h")
+    v = pd.MultiIndex.from_product([df.axe.astype(str).unique(), h], names=["axe", "datetime"]).to_frame(index=False).merge(v, how="left")
+    v = externes(v.assign(datetime_utc=v.datetime.dt.tz_convert("UTC"))).drop(columns="datetime_utc")
+    full = pd.concat([df, v.assign(impute_debit=False, impute_occupation=False, barre=False)], ignore_index=True)
+    return full.assign(axe=full.axe.astype("category"), vacances=full.vacances.astype("category"))
+
+
+def test_final(df: pd.DataFrame, cible: str = "debit", features: list | str | None = None, fin=None):
+    """Jeu de test FINAL : de la 1re heure après la fin de df jusqu'à `fin` -> X_train, X_test, y_train, y_test.
+    Vraies valeurs téléchargées sur l'API open data (cache data/external/test_final.csv, le supprimer pour mettre à jour).
+    Features calculées comme le jour J (lags masqués après la dernière donnée). Champs-Élysées absent (capteur invalide)."""
+    full, t0 = ajouter_futur(df, cible, fin or vraies_valeurs(df).datetime.max())  # par défaut : jusqu'à la dernière vraie valeur
+    y = full[["axe", "datetime"]].astype({"axe": str}).merge(vraies_valeurs(df), how="left")[cible].set_axis(full.index)
+    train, test = (full.datetime < t0) & full[cible].notna(), (full.datetime >= t0) & y.notna()
+    X = full[TOUTES if features == "toutes" else features or FEATURES]
+    X = X.astype({c: float for c in X if X[c].dtype == bool})
+    return X[train], X[test], full.loc[train, cible], y[test]
 
 
 if __name__ == "__main__":

@@ -98,7 +98,6 @@ Avec Download ZIP, télécharger une nouvelle archive et l’extraire dans un au
 
 ## Notebook et vérifications
 
-Le notebook `datathon_bcgx.ipynb` retrouve automatiquement `dataset_create.py` à la racine du dépôt. Ce module appartient au projet : il ne faut pas chercher à installer un paquet nommé `dataset_create` avec pip. Voir le [diagnostic d’import](../DIAGNOSTIC_IMPORT.md). Les sauvegardes des premières versions sont conservées localement et ne font pas partie des fichiers publiés. Les outils propres au notebook, comme matplotlib et seaborn, peuvent nécessiter une installation dans son kernel.
 
 Depuis la racine, lancer les tests des données, du calendrier, de l’import CSV, du planning et des calculs :
 
@@ -116,4 +115,4 @@ Pour les parcours navigateur, installer les dépendances de développement et la
 .\.venv\Scripts\python.exe tests/browser_scenarios.py
 ```
 
-Les tests vérifient les trois onglets, le partage des gains, les filtres, l’import CSV et l’export agenda. Leurs données synthétiques ne sont pas conservées dans l’application. Les aperçus publiés se trouvent dans [`artifacts/flowpilot_overview.png`](../artifacts/flowpilot_overview.png), [`artifacts/flowpilot_impact.png`](../artifacts/flowpilot_impact.png) et [`artifacts/flowpilot_planning.png`](../artifacts/flowpilot_planning.png).
+Les tests vérifient les trois onglets, le partage des gains, les filtres, l’import CSV et l’export agenda. Leurs données synthétiques ne sont pas conservées dans l’application. Les aperçus publiés se trouvent dans [`artifacts/flowpilot_overview.png`](artifacts/flowpilot_overview.png), [`artifacts/flowpilot_impact.png`](artifacts/flowpilot_impact.png) et [`artifacts/flowpilot_planning.png`](artifacts/flowpilot_planning.png).

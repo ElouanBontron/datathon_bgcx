@@ -9,7 +9,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $repositoryUrl = 'https://github.com/ElouanBontron/datathon_bgcx.git'
-$workspacePath = [System.IO.Path]::GetFullPath($PSScriptRoot)
+$workspacePath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $upstreamPath = Join-Path -Path $workspacePath -ChildPath 'upstream'
 $isFullClone = Test-Path -LiteralPath (Join-Path -Path $workspacePath -ChildPath '.git')
 $repositoryPath = if ($isFullClone) {

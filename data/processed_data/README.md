@@ -59,7 +59,7 @@ debit = df.pivot(index="datetime", columns="axe", values="debit")
 
 ## Comment il a été construit
 
-`dataset_create.py` à la racine (`.venv/Scripts/python dataset_create.py --jobs 4`, ~5 min) :
+`dataset_create.py` à la racine (`uv run python dataset_create.py --jobs 4`, ~5 min) :
 
 - `dataset_annee(annee)` : lit `data/unprocessed_data/<annee>/` (archives `*.txt` 2014-2025 ou
   exports du challenge `*.csv` dans `2026/`), garde les 3 arcs, renvoie la grille horaire complète.
