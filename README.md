@@ -107,4 +107,4 @@ python -m streamlit run app.py
 
 [Guide FlowPilot](interface/README.md) : installation, hypotheses, import CSV et tests. Le profil historique et les gains sont des estimations, en attendant les previsions finales de l'equipe.
 
-![Vue d'ensemble de FlowPilot](interface/artifacts/flowpilot_overview.
+![Vue d'ensemble de FlowPilot](interface/artifacts/flowpilot_overview.png)
