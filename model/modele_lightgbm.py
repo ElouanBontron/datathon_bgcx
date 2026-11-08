@@ -1,12 +1,11 @@
 """LightGBM : un seul modèle pour les 3 arcs (axe est une feature), entraîné sur tout l'historique avant t0.
-Lancer depuis la racine : uv run python model/modele_lightgbm.py  -> test final + model/output_lightgbm.csv"""
+Lancer depuis la racine : uv run python model/modele_lightgbm.py"""
 import lightgbm as lgb
 import pandas as pd
 from commun import lancer
 from dataset_create import FEATURES
 
-# Débit : meilleurs réglages trouvés à la main sur le backtest (90.8 contre 92.5 avec les réglages par défaut).
-# Occupation : réglages par défaut (le huber alpha=100 est à l'échelle du débit, pas de l'occupation).
+# débit : réglages trouvés à la main sur le backtest ; occupation : réglages par défaut
 PARAMS = {"debit": dict(n_estimators=1000, learning_rate=0.05, num_leaves=127, objective="huber", alpha=100),
           "occupation": dict(n_estimators=500, learning_rate=0.05, num_leaves=31, min_child_samples=20)}
 

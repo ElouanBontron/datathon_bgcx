@@ -1,7 +1,7 @@
 """Imputation des heures manquantes du débit de nos 3 arcs à partir des capteurs des rues voisines.
 
 Usage : charger(imputer=True) dans dataset_create, ou directement imputer_voisins(df).
-Explications : explication_voisins_v2.pdf
+Explications et comparaison avec ffill / interpolation : notebooks/voisins_imputation.ipynb
 """
 
 import io

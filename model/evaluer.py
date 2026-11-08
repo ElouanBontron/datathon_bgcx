@@ -1,28 +1,32 @@
-"""Compare les modèles sur la validation (VAL : 1 vendredi sur 4, moyenne des RMSE par semaine) et sur le test final.
-Lancer depuis la racine : uv run python model/evaluer.py [debit|occupation] [modèles...]
-ex. uv run python model/evaluer.py debit lightgbm naif"""
+"""Compare LightGBM, XGBoost, Timestral, leur moyenne (le modèle final) et le naïf (même heure 7 jours avant).
+RMSE par arc, sur 3 tests :
+1. semaine 2025 : dernière donnée le ven. 07/11/2025, on prédit sam. 08 -> mer. 12/11/2025 (11/11 férié inclus)
+2. test final   : du 01/11/2026 (fin des données) au 06/11/2026 (vraies valeurs de l'API)
+3. backtest     : avec --backtest, 1 vendredi sur 4 de nov. 2024 à oct. 2026 (moyenne des semaines, ~1 h)
+Usage : uv run python model/evaluer.py [debit|occupation] [--backtest]"""
 import sys
-from importlib import import_module
 
 import pandas as pd
-from commun import VAL, charger, jeu_final, jeu_val, rmse
+from commun import ORIGINES, charger, jeu_final, jeu_val, rmse
+from modele_ensemble import MODELES
 
-naif = lambda full, t0, cible: full.lag_7j[full.datetime >= t0]  # même heure 7 jours avant
-cibles = [a for a in sys.argv[1:] if a in ("debit", "occupation")] or ["debit", "occupation"]
-noms = [a for a in sys.argv[1:] if a not in cibles] or ["naif", "lightgbm", "chronos", "prophet"]
-MODELES = {n: naif if n == "naif" else import_module(f"modele_{n}").predire for n in noms}
+CIBLE = "occupation" if "occupation" in sys.argv else "debit"
+
+
+def scores(full, t0, test):
+    p = {nom: f(full, t0, CIBLE).clip(0) for nom, f in MODELES.items()}
+    p["ensemble"] = pd.concat(p.values(), axis=1).mean(axis=1)
+    p["naif"] = full.lag_7j[full.datetime >= t0]
+    return pd.DataFrame({nom: rmse(full, test, v) for nom, v in p.items()})
+
+
+def afficher(nom, t):
+    print(f"\n===== {CIBLE} | {nom}\n", pd.concat([t, t.mean().to_frame("moyenne").T]).round(2 if CIBLE == "occupation" else 1), flush=True)
+
 
 df = charger(imputer=True)
-for cible in cibles:
-    val = []
-    for t0 in VAL:
-        full, t0, test = jeu_val(df, cible, t0)
-        if test.any():
-            val.append(pd.DataFrame({n: rmse(full, test, f(full, t0, cible)) for n, f in MODELES.items()}))
-            print(f"  {cible} {t0:%Y-%m-%d} ok", flush=True)
-    val = pd.concat(val).groupby(level=0).mean()
-    full, t0, test = jeu_final(df, cible)
-    final = pd.DataFrame({n: rmse(full, test, f(full, t0, cible)) for n, f in MODELES.items()})
-    for nom, t in [("VALIDATION", val), ("TEST FINAL", final)]:
-        print(f"\n===== {nom} {cible} ({len(VAL)} origines)" if nom == "VALIDATION" else f"\n===== {nom} {cible}")
-        print(pd.concat([t, t.mean().to_frame("moyenne").T]).round(1), flush=True)
+afficher("semaine 2025", scores(*jeu_val(df, CIBLE, "2025-11-07")))
+afficher("test final", scores(*jeu_final(df, CIBLE)))
+if "--backtest" in sys.argv:
+    semaines = (jeu_val(df, CIBLE, t0) for t0 in ORIGINES[::4])
+    afficher("backtest", pd.concat([scores(*s) for s in semaines if s[2].any()]).groupby(level=0).mean())
